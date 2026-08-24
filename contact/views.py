@@ -1,5 +1,6 @@
 import logging
 import urllib.request
+import urllib.error
 import json
 import os
 from django.conf import settings
@@ -43,6 +44,10 @@ def send_resend_email(to_email, subject, body):
     try:
         with urllib.request.urlopen(req, timeout=5) as response:
             return response.status in [200, 201, 202]
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8")
+        logger.error(f"Failed to send email via Resend: {e}. Response: {error_body}")
+        return False
     except Exception as e:
         logger.error(f"Failed to send email via Resend: {e}")
         return False
