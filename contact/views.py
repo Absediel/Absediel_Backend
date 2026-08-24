@@ -1,5 +1,7 @@
 import logging
-from django.core.mail import send_mail
+import urllib.request
+import json
+import os
 from django.conf import settings
 from rest_framework.decorators import api_view, throttle_classes
 from .throttling import EmailRateThrottle
@@ -8,6 +10,42 @@ from rest_framework import status
 from .serializers import ContactSubmissionSerializer
 
 logger = logging.getLogger(__name__)
+
+def send_resend_email(to_email, subject, body):
+    api_key = os.getenv("RESEND_API_KEY")
+    if not api_key:
+        logger.error("RESEND_API_KEY environment variable is not set.")
+        return False
+        
+    url = "https://api.resend.com/emails"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    # By default, Resend free accounts send from onboarding@resend.dev
+    from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+    
+    data = {
+        "from": from_email,
+        "to": [to_email],
+        "subject": subject,
+        "text": body
+    }
+    
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(data).encode("utf-8"),
+        headers=headers,
+        method="POST"
+    )
+    
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            return response.status in [200, 201, 202]
+    except Exception as e:
+        logger.error(f"Failed to send email via Resend: {e}")
+        return False
 
 @api_view(['POST'])
 @throttle_classes([EmailRateThrottle])
@@ -59,32 +97,16 @@ Please respond to this request promptly."""
     
     # User email confirmation
     try:
-        send_mail(
-            subject=user_subject,
-            message=user_body,
-            from_email=settings.DEFAULT_FROM_EMAIL or 'noreply@absediel.com',
-            recipient_list=[email],
-            fail_silently=False,
-        )
-        email_sent_user = True
+        email_sent_user = send_resend_email(email, user_subject, user_body)
     except Exception as e:
         logger.error(f"Failed to send confirmation email to user: {e}")
-        print(f"SMTP Error user email: {e}")
         
     # Admin email notification
     try:
         admin_recipient = getattr(settings, 'ADMIN_EMAIL', 'absedieltechnologies@gmail.com')
-        send_mail(
-            subject=admin_subject,
-            message=admin_body,
-            from_email=settings.DEFAULT_FROM_EMAIL or 'noreply@absediel.com',
-            recipient_list=[admin_recipient],
-            fail_silently=False,
-        )
-        email_sent_admin = True
+        email_sent_admin = send_resend_email(admin_recipient, admin_subject, admin_body)
     except Exception as e:
         logger.error(f"Failed to send notification email to admin: {e}")
-        print(f"SMTP Error admin email: {e}")
         
     return Response({
         'message': 'Thank you for getting in touch! We will get back to you shortly.',
