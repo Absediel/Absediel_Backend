@@ -162,6 +162,7 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'absedieltechnologies@gmail.com')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', 'vlod gdqr obmp obcy')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'absedieltechnologies@gmail.com')
+EMAIL_TIMEOUT = 5
 
 # Django REST Framework Settings
 REST_FRAMEWORK = {
